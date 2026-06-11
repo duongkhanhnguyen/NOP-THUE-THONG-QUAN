@@ -585,56 +585,61 @@
         }
 
         // =========================================================================
-        // QUY TRÌNH KÝ TOKEN & TRUYỀN EDI
-        // =========================================================================
-        function khoiDongQuyTrinhTruyenEDI() {
-            let maTK = document.getElementById('txtMaToKhai').value;
-            let tokenCert = document.getElementById('cboTokenCert').value;
-            let soDuRaw = document.getElementById('txtSoDu').value.replace(/\./g, "");
-            let soDuHienCo = parseInt(soDuRaw, 10) || 0;
-            let tenNganHangHeThong = document.getElementById('cboNganHang').value;
+// QUY TRÌNH KÝ TOKEN & TRUYỀN EDI (ĐÃ CẬP NHẬT KIỂM TRA SỐ DƯ THỰC TẾ)
+// =========================================================================
+function khoiDongQuyTrinhTruyenEDI() {
+    let maTK = document.getElementById('txtMaToKhai').value;
+    let tokenCert = document.getElementById('cboTokenCert').value;
+    let soDuRaw = document.getElementById('txtSoDu').value.replace(/\./g, "");
+    let soDuHienCo = parseInt(soDuRaw, 10) || 0;
+    let tenNganHangHeThong = document.getElementById('cboNganHang').value;
 
-            if(!maTK || maTK.includes("Chờ")) {
-                alert("Vui lòng chọn một tệp tờ khai hợp lệ trước!"); return;
-            }
+    if(!maTK || maTK.includes("Chờ")) {
+        alert("Vui lòng chọn một tệp tờ khai hợp lệ trước!"); return;
+    }
 
-            if(soDuHienCo < globalCustomsData.tienThue) {
-                soDuHienCo = globalCustomsData.tienThue + 20000000;
-                document.getElementById('txtSoDu').value = soDuHienCo.toLocaleString('vi-VN');
-            }
+    // --- CẬP NHẬT LOGIC CHUYÊN GIA: KIỂM TRA SỐ DƯ TÀI KHOẢN ---
+    if(soDuHienCo < globalCustomsData.tienThue) {
+        alert(`🚨 [LỖI GIAO DỊCH e-TAX 24/7]\n\n` +
+              `Không thể thực hiện trích nộp thuế điện tử!\n` +
+              `- Số dư khả dụng hiện tại: ${soDuHienCo.toLocaleString('vi-VN')} VNĐ\n` +
+              `- Tổng số tiền thuế phải nộp: ${globalCustomsData.tienThue.toLocaleString('vi-VN')} VNĐ\n\n` +
+              `Vui lòng kiểm tra lại thông tin tài khoản hoặc nâng hạn mức/số dư khả dụng ở TAB 1 trước khi truyền tờ khai.`);
+        return; // Dừng luồng xử lý, không cho phép ký token hay truyền EDI
+    }
 
-            document.getElementById('progressBarMain').style.display = "block";
-            document.getElementById('ediPanel').style.display = "block";
-            
-            let logBox = document.getElementById('ediLog');
-            let progressFill = document.getElementById('progressBarFill');
-            let btn = document.getElementById('btnKyToken');
-            
-            logBox.innerHTML = ""; progressFill.style.width = "0%"; btn.disabled = true;
+    document.getElementById('progressBarMain').style.display = "block";
+    document.getElementById('ediPanel').style.display = "block";
+    
+    let logBox = document.getElementById('ediLog');
+    let progressFill = document.getElementById('progressBarFill');
+    let btn = document.getElementById('btnKyToken');
+    
+    logBox.innerHTML = ""; progressFill.style.width = "0%"; btn.disabled = true;
 
-            let logsSteps = [
-                { p: 15, msg: `[CONNECT] Đang kết nối mã khóa bảo mật phần cứng Chữ ký số [${tokenCert}]...` },
-                { p: 40, msg: `[SIGNING] Thực hiện ký số điện tử chuỗi dữ liệu XML sang định dạng mã hóa Base64...` },
-                { p: 65, msg: `[EDI-SEND] Khởi tạo luồng thông điệp số gửi tới điểm tiếp nhận của Tổng cục Hải quan...` },
-                { p: 85, msg: `[BANK-LINK] Hệ thống ngân hàng [${tenNganHangHeThong}] thực hiện hạch toán ủy nhiệm chi tự động số tiền: ${globalCustomsData.tienThue.toLocaleString('vi-VN')} VNĐ...` },
-                { p: 100, msg: `[SUCCESS] Phản hồi kết quả tiếp nhận & nộp thuế điện tử e-Tax thành công.` }
-            ];
+    let logsSteps = [
+        { p: 15, msg: `[CONNECT] Đang kết nối mã khóa bảo mật phần cứng Chữ ký số [${tokenCert}]...` },
+        { p: 40, msg: `[SIGNING] Thực hiện ký số điện tử chuỗi dữ liệu XML sang định dạng mã hóa Base64...` },
+        { p: 65, msg: `[EDI-SEND] Khởi tạo luồng thông điệp số gửi tới điểm tiếp nhận của Tổng cục Hải quan...` },
+        { p: 85, msg: `[BANK-LINK] Hệ thống ngân hàng [${tenNganHangHeThong}] thực hiện hạch toán ủy nhiệm chi tự động số tiền: ${globalCustomsData.tienThue.toLocaleString('vi-VN')} VNĐ...` },
+        { p: 100, msg: `[SUCCESS] Phản hồi kết quả tiếp nhận & nộp thuế điện tử e-Tax thành công.` }
+    ];
 
-            let stepIndex = 0;
-            function chayHieuUngSimulate() {
-                if(stepIndex < logsSteps.length) {
-                    let currentStep = logsSteps[stepIndex];
-                    progressFill.style.width = currentStep.p + "%";
-                    logBox.innerHTML += `<div>${new Date().toLocaleTimeString()} -> ${currentStep.msg}</div>`;
-                    logBox.scrollTop = logBox.scrollHeight;
-                    stepIndex++;
-                    setTimeout(chayHieuUngSimulate, 400);
-                } else {
-                    XulyHachToanVaChuyenTab(soDuHienCo, btn, tenNganHangHeThong);
-                }
-            }
-            chayHieuUngSimulate();
+    let stepIndex = 0;
+    function chayHieuUngSimulate() {
+        if(stepIndex < logsSteps.length) {
+            let currentStep = logsSteps[stepIndex];
+            progressFill.style.width = currentStep.p + "%";
+            logBox.innerHTML += `<div>${new Date().toLocaleTimeString()} -> ${currentStep.msg}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+            stepIndex++;
+            setTimeout(chayHieuUngSimulate, 400);
+        } else {
+            XulyHachToanVaChuyenTab(soDuHienCo, btn, tenNganHangHeThong);
         }
+    }
+    chayHieuUngSimulate();
+}
 
         function XulyHachToanVaChuyenTab(soDu, btnControl, tenNganHang) {
             btnControl.disabled = false;
